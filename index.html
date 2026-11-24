@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>クラス予定表</title>
+<style>
+:root{--bg:#eef1ec;--panel:#fff;--ink:#1d2a22;--line:#c9d2c7;--accent:#2f6b54;--on-accent:#fff;color-scheme:light dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101612;--panel:#1a231d;--ink:#e6ece6;--line:#33433a;--accent:#6fbf9a;--on-accent:#10241a}}
+:root[data-theme="dark"]{--bg:#101612;--panel:#1a231d;--ink:#e6ece6;--line:#33433a;--accent:#6fbf9a;--on-accent:#10241a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif}
+main{max-width:1000px;margin:0 auto;padding:16px}
+h1{font-size:1.3rem;margin:4px 0 12px}
+h2{font-size:1rem;margin:0 0 8px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin:16px 0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+input,button{font:inherit;color:inherit}
+input[type=date],input[type=text]{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:44px}
+input[type=text]{flex:1;min-width:110px}
+#x{flex:3;min-width:200px}
+.seg label{display:inline-block;padding:9px 16px;border:1px solid var(--line);border-radius:8px;cursor:pointer;min-height:44px}
+.seg input{position:absolute;opacity:0}
+.seg label:has(input:checked){background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.btn{background:var(--accent);color:var(--on-accent);border:0;border-radius:8px;padding:10px 18px;min-height:44px;cursor:pointer}
+.btn.sub{background:transparent;color:var(--ink);border:1px solid var(--line)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.sw{width:44px;height:44px;border-radius:50%;border:3px solid transparent;cursor:pointer;padding:0}
+.sw[aria-pressed=true]{border-color:var(--ink)}
+#out{width:100%;display:block;border-radius:4px}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;white-space:nowrap;padding-right:8px;font-weight:400}
+td input{width:100%}
+td:first-of-type{width:34%}
+.list{list-style:none;margin:0;padding:8px 12px;background:#214c29;border-radius:6px}
+.list li{display:flex;justify-content:space-between;gap:8px;padding:3px 0;cursor:pointer;word-break:break-all}
+.list button{background:none;border:0;color:#fff;opacity:.5;min-width:44px;margin:-8px 0;cursor:pointer}
+#st{margin:6px 0 0;min-height:1.4em;color:var(--accent)}
+.note{font-size:.88rem;opacity:.75;margin:6px 0 0}
+</style>
+</head>
+<body>
+<main>
+<h1>クラス予定表</h1>
+<img id="out" alt="完成した予定表の画像">
+<div class="row" style="margin-top:10px">
+<button class="btn" id="share">共有</button>
+<button class="btn sub" id="dl">ダウンロード</button>
+</div>
+<p id="st" role="status"></p>
+
+<section class="panel">
+<h2>日付と時間割</h2>
+<div class="row"><input type="date" id="d" aria-label="日付"></div>
+<div class="tw"><table id="tt"></table></div>
+</section>
+
+<section class="panel">
+<h2>文字の色</h2>
+<div class="row" id="pal"></div>
+<p class="note">文字を選んでから色を押すと、その部分だけ色が変わります(文章に {黄|…} と入ります)。何も選ばずに押すと、次に追加する課題・予定の色になります。</p>
+</section>
+
+<section class="panel">
+<h2>課題・予定を追加</h2>
+<div class="row seg">
+<label><input type="radio" name="k" value="h" checked><span>課題</span></label>
+<label><input type="radio" name="k" value="e"><span>予定</span></label>
+</div>
+<div class="row">
+<input type="date" id="ad" aria-label="日付">
+<input type="text" id="t" placeholder="時刻・時限(例 11:45 / 3限 / 放課後)" aria-label="時刻・時限">
+</div>
+<div class="row">
+<input type="text" id="x" placeholder="内容(例 工業技術基礎 レポート)" aria-label="内容">
+<button class="btn" id="add">追加する</button>
+</div>
+</section>
+
+<section class="panel">
+<h2>入力した課題・予定</h2>
+<ul class="list" id="list"></ul>
+<p class="note">項目をタップすると、行全体の色が順に変わります。</p>
+<div class="row" style="margin-top:8px"><button class="btn sub" id="clean">過ぎた日の項目を削除</button></div>
+</section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const WD='日月火水木金土',KEY='classboard.v3';
+const PAL=['#f4f4ee','#efe86b','#72b86c','#8fb8e8','#f29b86'],NAMES=['白','黄','緑','青','橙'];
+const PER=['1限','2限','3限','4限','昼休憩','5限','6限','放課後'];
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const parse=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const fmt=s=>{const d=parse(s);return (d.getMonth()+1)+'/'+d.getDate()+'('+WD[d.getDay()]+')'};
+const todayS=()=>iso(new Date());
+const line=i=>{
+  const sp=i.t&&!/^\d/.test(i.t)?' ':'';
+  return (i.d?fmt(i.d)+sp+(i.t||'')+(i.k==='h'?'〆':'')+' | ':'| ')+i.x;
+};
+const sorter=(a,b)=>(a.d||'9999').localeCompare(b.d||'9999')||(a.t||'').localeCompare(b.t||'');
+let S={date:'',rows:PER.map(()=>({s:'',n:''})),items:[]},cur=PAL[0],file=null,url=null,timer=null,last=null;
+try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const say=m=>{$('#st').textContent=m};
+
+/* ---- text with {色|文字} markup ---- */
+const FONT=px=>px+'px "Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+const m=document.createElement('canvas').getContext('2d');
+function chars(str,base){
+  const out=[],re=/\{(白|黄|緑|青|橙)\|([^}]*)\}/g;let i=0,r;
+  const add=(s,c)=>{for(const ch of s)out.push({ch,c})};
+  while((r=re.exec(str))){add(str.slice(i,r.index),base);add(r[2],PAL[NAMES.indexOf(r[1])]);i=re.lastIndex}
+  add(str.slice(i),base);return out;
+}
+function runs(cs){const o=[];cs.forEach(k=>{const l=o[o.length-1];if(l&&l.c===k.c)l.t+=k.ch;else o.push({t:k.ch,c:k.c})});return o}
+function wrapRuns(str,base,max,hang,fs){
+  m.font=FONT(fs);const lines=[];let cur=[],w=0,mx=max;
+  for(const k of chars(str,base)){
+    const cw=m.measureText(k.ch).width;
+    if(w+cw>mx&&cur.length){lines.push(runs(cur));cur=[];w=0;mx=max-hang}
+    cur.push(k);w+=cw;
+  }
+  lines.push(runs(cur));return lines;
+}
+function drawRuns(x,y,rs,ctx){for(const r of rs){ctx.fillStyle=r.c;ctx.fillText(r.t,x,y);x+=ctx.measureText(r.t).width}}
+
+/* ---- image ---- */
+function draw(){
+  const up=[...S.items].sort(sorter),IF=23,LH=28.7,HANG=IF*1.2,CW=730;
+  const blocks=['h','e'].map(k=>up.filter(i=>i.k===k).map(i=>wrapRuns(line(i),i.c||PAL[0],CW,HANG,IF)));
+  const nl=b=>b.reduce((s,l)=>s+l.length,0);
+  const bH=Math.max(390,100+Math.max(nl(blocks[0]),nl(blocks[1]))*LH+40);
+  const Wd=1670,H=550+bH+10;
+  const cv=document.createElement('canvas');cv.width=Wd;cv.height=H;
+  const x=cv.getContext('2d'),G='#214c29',WH=PAL[0];
+  x.fillStyle='#8c8c8c';x.fillRect(0,0,Wd,H);
+  x.fillStyle=G;x.fillRect(10,10,1650,530);x.fillRect(10,550,1650,bH);
+  const ds=S.date||todayS(),dt=parse(ds);
+  x.textBaseline='middle';x.textAlign='left';
+  x.font=FONT(36);x.fillStyle=WH;x.fillText(fmt(ds),50,50);
+  x.fillStyle=WH;[35,192,385,1563].forEach(b=>x.fillRect(b,88,4,384));
+  PER.forEach((p,i)=>{
+    const cy=126+i*38.6,row=S.rows[i]||{s:'',n:''};
+    x.textAlign='center';x.font=FONT(32);x.fillStyle=WH;x.fillText(p,113,cy);
+    spread(x,row.s.trim(),205,167,cy);
+    x.textAlign='left';x.font=FONT(23);
+    const rs=runs(chars(row.n,WH)),tw=rs.reduce((s,r)=>s+x.measureText(r.t).width,0);
+    x.save();x.translate(398,cy);if(tw>1150)x.scale(1150/tw,1);drawRuns(0,0,rs,x);x.restore();
+  });
+  x.textAlign='center';x.font=FONT(34);x.fillStyle=WH;
+  [String(dt.getMonth()+1),'月',String(dt.getDate()),'日'].forEach((t,i)=>x.fillText(t,1611,170+i*38.6));
+  const wy=[314,338,362];
+  [['(',1],[WD[dt.getDay()],0],[')',1]].forEach(([t,r],i)=>{x.save();x.translate(1611,wy[i]);if(r)x.rotate(Math.PI/2);x.fillText(t,0,0);x.restore()});
+  x.fillStyle=WH;[35,800,1563].forEach(b=>x.fillRect(b,552,4,bH-30));
+  x.textAlign='left';
+  ['課題等','予定等'].forEach((h,c)=>{
+    const x0=c?825:60;
+    x.font=FONT(22);x.fillStyle='#e9efe9';x.fillText(h,x0,588);
+    x.font=FONT(IF);let y=624;
+    blocks[c].forEach(ls=>ls.forEach((rs,j)=>{drawRuns(x0+(j?HANG:0),y,rs,x);y+=LH}));
+  });
+  file=null;
+  cv.toBlob(b=>{
+    if(!b)return;
+    file=new File([b],'予定表_'+ds.slice(5).replace('-','')+'.png',{type:'image/png'});
+    if(url)URL.revokeObjectURL(url);
+    url=URL.createObjectURL(b);$('#out').src=url;
+  },'image/png');
+}
+function spread(x,t,x0,w,cy){
+  const cs=[...t];if(!cs.length)return;
+  x.font=FONT(24);x.fillStyle=PAL[0];
+  const tw=cs.reduce((s,c)=>s+x.measureText(c).width,0);
+  if(cs.length<2||cs.length>6||t[0]==='('||tw>w){x.textAlign='center';x.fillText(t,x0+w/2,cy);return}
+  const gap=(w-tw)/(cs.length-1);x.textAlign='left';let px=x0;
+  cs.forEach(c=>{x.fillText(c,px,cy);px+=x.measureText(c).width+gap});
+}
+const drawSoon=()=>{clearTimeout(timer);timer=setTimeout(draw,200)};
+
+/* ---- editor ---- */
+function buildTT(){
+  const t=$('#tt');t.replaceChildren();
+  PER.forEach((p,i)=>{
+    const tr=document.createElement('tr'),th=document.createElement('th');th.textContent=p;tr.append(th);
+    [['s','科目'],['n','持ち物・連絡']].forEach(([k,lb])=>{
+      const td=document.createElement('td'),inp=document.createElement('input');
+      inp.type='text';inp.value=(S.rows[i]||{})[k]||'';inp.placeholder=lb;inp.setAttribute('aria-label',p+'の'+lb);
+      inp.oninput=()=>{S.rows[i][k]=inp.value;save();drawSoon()};
+      td.append(inp);tr.append(td);
+    });
+    t.append(tr);
+  });
+}
+function buildPal(){
+  const p=$('#pal');p.replaceChildren();
+  PAL.forEach((c,i)=>{
+    const b=document.createElement('button');b.className='sw';b.style.background=c;
+    b.setAttribute('aria-label',NAMES[i]);b.setAttribute('aria-pressed',c===cur);
+    b.onclick=()=>{
+      cur=c;const el=last;
+      if(el&&el.selectionEnd>el.selectionStart){
+        const a=el.selectionStart,e=el.selectionEnd,v=el.value;
+        el.value=v.slice(0,a)+'{'+NAMES[i]+'|'+v.slice(a,e)+'}'+v.slice(e);
+        el.setSelectionRange(0,0);el.dispatchEvent(new Event('input'));
+      }
+      buildPal();
+    };
+    p.append(b);
+  });
+}
+function renderList(){
+  const ul=$('#list');ul.replaceChildren();
+  [...S.items].sort(sorter).forEach(it=>{
+    const li=document.createElement('li'),s=document.createElement('span');
+    s.textContent=(it.k==='h'?'課題 ':'予定 ')+line(it);s.style.color=it.c||PAL[0];
+    li.onclick=()=>{const n=PAL.indexOf(it.c);it.c=PAL[(n+1)%PAL.length];save();render()};
+    const b=document.createElement('button');b.textContent='×';b.setAttribute('aria-label','削除');
+    b.onclick=e=>{e.stopPropagation();S.items=S.items.filter(v=>v!==it);save();render()};
+    li.append(s,b);ul.append(li);
+  });
+}
+function render(){renderList();drawSoon()}
+
+document.addEventListener('focusin',e=>{if(e.target.matches('input[type=text]'))last=e.target});
+$('#add').onclick=()=>{
+  const x=$('#x').value.trim();
+  if(!x){say('内容を入力してください。');return}
+  S.items.push({k:document.querySelector('input[name=k]:checked').value,d:$('#ad').value,t:$('#t').value.trim(),x,c:cur});
+  save();$('#x').value='';$('#t').value='';say('追加しました。');render();
+};
+$('#x').addEventListener('keydown',e=>{if(e.key==='Enter')$('#add').click()});
+$('#d').onchange=()=>{S.date=$('#d').value;save();drawSoon()};
+$('#clean').onclick=()=>{S.items=S.items.filter(i=>!i.d||i.d>=todayS());save();say('過ぎた日の項目を削除しました。');render()};
+$('#share').onclick=async()=>{
+  if(!file){say('画像を準備中です。もう一度押してください。');return}
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]})}catch(e){}}
+  else say('この環境では共有できません。ダウンロードか、画像の長押しで保存してください。');
+};
+$('#dl').onclick=()=>{
+  if(!file){say('画像を準備中です。もう一度押してください。');return}
+  const a=document.createElement('a');a.href=url;a.download=file.name;document.body.append(a);a.click();a.remove();
+};
+$('#d').value=S.date||todayS();$('#ad').value=todayS();
+buildTT();buildPal();render();
+</script>
+</body>
+</html>
