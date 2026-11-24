@@ -55,6 +55,7 @@ td:first-of-type{width:34%}
 <h2>日付と時間割</h2>
 <div class="row"><input type="date" id="d" aria-label="日付"></div>
 <div class="tw"><table id="tt"></table></div>
+<p class="note">7限は、科目か持ち物を入れたときだけ画像に表示されます。</p>
 </section>
 
 <section class="panel">
@@ -91,7 +92,7 @@ td:first-of-type{width:34%}
 const $=s=>document.querySelector(s);
 const WD='日月火水木金土',KEY='classboard.v3';
 const PAL=['#f4f4ee','#efe86b','#72b86c','#8fb8e8','#f29b86'],NAMES=['白','黄','緑','青','橙'];
-const PER=['1限','2限','3限','4限','昼休憩','5限','6限','放課後'];
+const PER=['1限','2限','3限','4限','昼休憩','5限','6限','7限','放課後'];
 const pad=n=>String(n).padStart(2,'0');
 const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const parse=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
@@ -104,6 +105,7 @@ const line=i=>{
 const sorter=(a,b)=>(a.d||'9999').localeCompare(b.d||'9999')||(a.t||'').localeCompare(b.t||'');
 let S={date:'',rows:PER.map(()=>({s:'',n:''})),items:[]},cur=PAL[0],file=null,url=null,timer=null,last=null;
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+if(S.rows.length===8)S.rows.splice(7,0,{s:'',n:''});
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const say=m=>{$('#st').textContent=m};
 
@@ -143,8 +145,11 @@ function draw(){
   x.textBaseline='middle';x.textAlign='left';
   x.font=FONT(36);x.fillStyle=WH;x.fillText(fmt(ds),50,50);
   x.fillStyle=WH;[35,192,385,1563].forEach(b=>x.fillRect(b,88,4,384));
+  let pos=0;
   PER.forEach((p,i)=>{
-    const cy=126+i*38.6,row=S.rows[i]||{s:'',n:''};
+    const row=S.rows[i]||{s:'',n:''};
+    if(p==='7限'&&!row.s.trim()&&!row.n.trim())return;
+    const cy=126+(pos++)*38.6;
     x.textAlign='center';x.font=FONT(32);x.fillStyle=WH;x.fillText(p,113,cy);
     spread(x,row.s.trim(),205,167,cy);
     x.textAlign='left';x.font=FONT(23);
